@@ -80,164 +80,185 @@ ${e.foods.map(f=>`${f.name} (${f.protein_g}g)`).join(", ")}
 
 }
 
-async function analyzeImage(dataUrl){
+/** Set your OpenAI API key. For production, use a backend to avoid exposing the key. */
+const OPENAI_API_KEY = ""
 
-const resp=await fetch("/.netlify/functions/analyze",{
-method:"POST",
-headers:{"Content-Type":"application/json"},
-body:JSON.stringify({image_data_url:dataUrl})
-})
+/** Current photo as base64 data URL (set when user selects/takes photo). */
+let currentPhotoDataUrl = null
 
-return resp.json()
+const PROMPT = `Analyze this meal photo. Estimate the protein in grams.
+Return valid JSON only in exactly this shape:
+{ "foods": [ { "name": "food item", "protein_g": 0 } ], "total_protein_g": 0 }
+Rules: Estimate visible foods only. Use reasonable portion assumptions. protein_g and total_protein_g must be numbers. Return JSON only.`
 
-}
+async function analyzeImage(dataUrl) {
+  if (!OPENAI_API_KEY) throw new Error("OpenAI API key is not set")
 
-photoEl.addEventListener("change", async () => {
+  const resp = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${OPENAI_API_KEY}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4.1-mini",
+      input: [
+        {
+          type: "message",
+          role: "user",
+          content: [
+            { type: "input_text", text: PROMPT },
+            { type: "input_image", image_url: dataUrl }
+          ]
+        }
+      ],
+      text: {
+        format: {
+          type: "json_schema",
+          name: "protein_estimate",
+          schema: {
+            type: "object",
+            additionalProperties: false,
+            properties: {
+              foods: {
+                type: "array",
+                items: {
+                  type: "object",
+                  additionalProperties: false,
+                  properties: {
+                    name: { type: "string" },
+                    protein_g: { type: "number" }
+                  },
+                  required: ["name", "protein_g"]
+                }
+              },
+              total_protein_g: { type: "number" }
+            },
+            required: ["foods", "total_protein_g"]
+          }
+        }
+      }
+    })
+  })
 
-  const file = photoEl.files[0]
-  if (!file) return
-
-  statusEl.textContent = "Preparing image..."
-
-  const reader = new FileReader()
-
-  reader.onload = async e => {
-
-    preview.src = e.target.result
-    preview.style.display = "block"
-
-    statusEl.textContent = "Ready to analyze"
-
+  const data = await resp.json().catch(() => ({}))
+  if (!resp.ok) {
+    const msg = data.error?.message || data.error || `Request failed (${resp.status})`
+    throw new Error(msg)
   }
 
-  reader.readAsDataURL(file)
+  const rawText =
+    data.output_text ||
+    (data.output || [])
+      .flatMap((item) => item.content || [])
+      .find((c) => c.type === "output_text")?.text ||
+    ""
 
+  let parsed
+  try {
+    parsed = JSON.parse(rawText)
+  } catch {
+    throw new Error("Could not parse model output")
+  }
+
+  if (typeof parsed.total_protein_g !== "number" || !Array.isArray(parsed.foods)) {
+    throw new Error("Model returned invalid shape")
+  }
+
+  return { foods: parsed.foods, total_protein_g: parsed.total_protein_g }
+}
+
+photoEl.addEventListener("change", () => {
+  const input = photoEl
+  if (!input.files || !input.files.length) return
+
+  statusEl.textContent = "Preparing image..."
+  preview.style.display = "none"
+  currentPhotoDataUrl = null
+
+  const file = input.files[0]
+  const reader = new FileReader()
+  reader.onerror = () => {
+    statusEl.textContent = "Could not read photo. Try again."
+  }
+  reader.onload = () => {
+    const dataUrl = reader.result
+    if (!dataUrl || typeof dataUrl !== "string") return
+    currentPhotoDataUrl = dataUrl
+    preview.src = dataUrl
+    preview.style.display = "block"
+    statusEl.textContent = "Ready to analyze"
+  }
+
+  setTimeout(() => {
+    reader.readAsDataURL(file)
+  }, 0)
 })
 
-analyzeBtn.addEventListener("click", async () => {
+/** Compress image to max 800px and return base64 data URL. */
+function compressToDataUrl(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onerror = () => reject(new Error("Failed to load image"))
+    img.onload = () => {
+      try {
+        const canvas = document.createElement("canvas")
+        const maxSize = 800
+        let width = img.width
+        let height = img.height
+        if (width > height && width > maxSize) {
+          height *= maxSize / width
+          width = maxSize
+        } else if (height > maxSize) {
+          width *= maxSize / height
+          height = maxSize
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext("2d")
+        ctx.drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL("image/jpeg", 0.7))
+      } catch (e) {
+        reject(e)
+      }
+    }
+    img.src = dataUrl
+  })
+}
 
-  const file = photoEl.files[0]
-  if (!file) {
+analyzeBtn.addEventListener("click", async () => {
+  if (!currentPhotoDataUrl) {
     statusEl.textContent = "Take a photo first"
     return
   }
 
+  analyzeBtn.disabled = true
   statusEl.textContent = "Analyzing..."
 
-  const reader = new FileReader()
-
-  reader.onload = async e => {
-
-    const data = await analyzeImage(e.target.result)
-
-    if (!data || !data.total_protein_g) {
-      statusEl.textContent = "AI analysis failed"
-      return
-    }
-
-    const entries = loadLog()
-
-    entries.push({
-      date: isoDate(),
-      foods: data.foods,
-      total_protein_g: data.total_protein_g
-    })
-
-    saveLog(entries)
-    refreshUI()
-
-    statusEl.textContent = "Saved"
-
-  }
-
-  reader.readAsDataURL(file)
-
-})
-
-const file=photoEl.files[0]
-if(!file)return
-
-statusEl.textContent="Analyzing..."
-
-const reader=new FileReader()
-
-reader.onload = async e => {
-
-  const img = new Image()
-  img.src = e.target.result
-
-  img.onload = async () => {
-
-    const canvas = document.createElement("canvas")
-    const maxSize = 800
-
-    let width = img.width
-    let height = img.height
-
-    if (width > height && width > maxSize) {
-      height *= maxSize / width
-      width = maxSize
-    } else if (height > maxSize) {
-      width *= maxSize / height
-      height = maxSize
-    }
-
-    canvas.width = width
-    canvas.height = height
-
-    const ctx = canvas.getContext("2d")
-    ctx.drawImage(img, 0, 0, width, height)
-
-    const compressed = canvas.toDataURL("image/jpeg", 0.7)
-
+  try {
+    const compressed = await compressToDataUrl(currentPhotoDataUrl)
     const data = await analyzeImage(compressed)
 
-    if (!data.total_protein_g) {
+    if (!data || typeof data.total_protein_g !== "number") {
       statusEl.textContent = "AI analysis failed. Try another photo."
       return
     }
 
     const entries = loadLog()
-
     entries.push({
       date: isoDate(),
-      foods: data.foods,
+      foods: Array.isArray(data.foods) ? data.foods : [],
       total_protein_g: data.total_protein_g
     })
-
     saveLog(entries)
     refreshUI()
-
     statusEl.textContent = "Saved"
-
+  } catch (err) {
+    const msg = err && err.message ? err.message : "Something went wrong"
+    statusEl.textContent = msg
+  } finally {
+    analyzeBtn.disabled = false
   }
-
-}
-const data=await analyzeImage(e.target.result)
-
-if (!data.total_protein_g) {
-  statusEl.textContent = "AI analysis failed. Try another photo.";
-  return;
-}
-
-const entries=loadLog()
-
-entries.push({
-date:isoDate(),
-foods:data.foods,
-total_protein_g:data.total_protein_g
-})
-
-saveLog(entries)
-
-refreshUI()
-
-statusEl.textContent="Saved"
-
-}
-
-reader.readAsDataURL(file)
-
 })
 
 clearBtn.addEventListener("click",()=>{
