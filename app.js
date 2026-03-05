@@ -80,92 +80,23 @@ ${e.foods.map(f=>`${f.name} (${f.protein_g}g)`).join(", ")}
 
 }
 
-/** Set your OpenAI API key. For production, use a backend to avoid exposing the key. */
-const OPENAI_API_KEY = ""
+const ANALYZE_URL = "https://steep-salad-b8d6.julie-m-gustin.workers.dev"
 
 /** Current photo as base64 data URL (set when user selects/takes photo). */
 let currentPhotoDataUrl = null
 
-const PROMPT = `Analyze this meal photo. Estimate the protein in grams.
-Return valid JSON only in exactly this shape:
-{ "foods": [ { "name": "food item", "protein_g": 0 } ], "total_protein_g": 0 }
-Rules: Estimate visible foods only. Use reasonable portion assumptions. protein_g and total_protein_g must be numbers. Return JSON only.`
-
 async function analyzeImage(dataUrl) {
-  if (!OPENAI_API_KEY) throw new Error("OpenAI API key is not set")
-
-  const resp = await fetch("https://api.openai.com/v1/responses", {
+  const resp = await fetch(ANALYZE_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": `Bearer ${OPENAI_API_KEY}`
-    },
-    body: JSON.stringify({
-      model: "gpt-4.1-mini",
-      input: [
-        {
-          type: "message",
-          role: "user",
-          content: [
-            { type: "input_text", text: PROMPT },
-            { type: "input_image", image_url: dataUrl }
-          ]
-        }
-      ],
-      text: {
-        format: {
-          type: "json_schema",
-          name: "protein_estimate",
-          schema: {
-            type: "object",
-            additionalProperties: false,
-            properties: {
-              foods: {
-                type: "array",
-                items: {
-                  type: "object",
-                  additionalProperties: false,
-                  properties: {
-                    name: { type: "string" },
-                    protein_g: { type: "number" }
-                  },
-                  required: ["name", "protein_g"]
-                }
-              },
-              total_protein_g: { type: "number" }
-            },
-            required: ["foods", "total_protein_g"]
-          }
-        }
-      }
-    })
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ image_data_url: dataUrl })
   })
-
   const data = await resp.json().catch(() => ({}))
   if (!resp.ok) {
-    const msg = data.error?.message || data.error || `Request failed (${resp.status})`
+    const msg = data.error || data.message || `Request failed (${resp.status})`
     throw new Error(msg)
   }
-
-  const rawText =
-    data.output_text ||
-    (data.output || [])
-      .flatMap((item) => item.content || [])
-      .find((c) => c.type === "output_text")?.text ||
-    ""
-
-  let parsed
-  try {
-    parsed = JSON.parse(rawText)
-  } catch {
-    throw new Error("Could not parse model output")
-  }
-
-  if (typeof parsed.total_protein_g !== "number" || !Array.isArray(parsed.foods)) {
-    throw new Error("Model returned invalid shape")
-  }
-
-  return { foods: parsed.foods, total_protein_g: parsed.total_protein_g }
+  return data
 }
 
 photoEl.addEventListener("change", () => {
