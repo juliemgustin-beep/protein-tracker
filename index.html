@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Protein Tracker</title>
+
+<link rel="stylesheet" href="styles.css"/>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+</head>
+
+<body>
+
+<main class="wrap">
+
+<header class="top">
+
+<h1>Protein Tracker</h1>
+
+<div class="stats">
+
+<div class="stat">
+<div class="label">Today</div>
+<div class="value" id="todayTotal">0g</div>
+</div>
+
+<div class="stat">
+<div class="label">Last 7 days</div>
+<div class="value" id="weekTotal">0g</div>
+</div>
+
+</div>
+
+<div class="goal">
+Goal: 100g • <span id="remaining">0g remaining</span>
+</div>
+
+<div class="progress">
+<div id="progressBar"></div>
+</div>
+
+</header>
+
+<section class="card">
+
+<h2>Add meal photo</h2>
+
+<label class="upload">
+<input id="photo" type="file" accept="image/*" capture="environment"/>
+Take photo
+</label>
+
+<img id="preview"/>
+
+<div class="photo-row">
+<button id="analyzeBtn">Analyze</button>
+<select id="mealType">
+<option>Breakfast</option>
+<option>Lunch</option>
+<option>Dinner</option>
+<option>Snack</option>
+</select>
+</div>
+
+<div class="hint" id="status"></div>
+<div class="result" id="result"></div>
+
+</section>
+
+<section class="card">
+
+<h2>Protein last 7 days</h2>
+<canvas id="proteinChart"></canvas>
+
+</section>
+
+<section class="card">
+
+<div class="row">
+<h2>Log</h2>
+<button class="secondary" id="clearBtn">Clear</button>
+</div>
+
+<div id="log"></div>
+
+</section>
+
+</main>
+
+<script src="app.js"></script>
+
+</body>
+</html>
