@@ -80,7 +80,7 @@ ${e.foods.map(f=>`${f.name} (${f.protein_g}g)`).join(", ")}
 
 }
 
-const ANALYZE_URL = "https://steep-salad-b8d6.julie-m-gustin.workers.dev"
+const ANALYZE_URL = "https://protein-tracker-worker.julie-m-gustin.workers.dev"
 
 /** Current photo as base64 data URL (set when user selects/takes photo). */
 let currentPhotoDataUrl = null
@@ -91,7 +91,12 @@ async function analyzeImage(dataUrl) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ image_data_url: dataUrl })
   })
-  const data = await resp.json().catch(() => ({}))
+  let data
+  try {
+    data = await resp.json()
+  } catch {
+    data = {}
+  }
   if (!resp.ok) {
     const msg = data.error || data.message || `Request failed (${resp.status})`
     throw new Error(msg)
