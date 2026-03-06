@@ -4,6 +4,7 @@ const PROTEIN_GOAL=100
 let chart
 
 const photoEl=document.getElementById("photo")
+const photoLibraryEl=document.getElementById("photoLibrary")
 const preview=document.getElementById("preview")
 const analyzeBtn=document.getElementById("analyzeBtn")
 const clearBtn=document.getElementById("clearBtn")
@@ -104,8 +105,8 @@ async function analyzeImage(dataUrl) {
   return data
 }
 
-photoEl.addEventListener("change", () => {
-  const input = photoEl
+function handlePhotoInput(ev) {
+  const input = ev.target
   if (!input.files || !input.files.length) return
 
   statusEl.textContent = "Preparing image..."
@@ -129,7 +130,10 @@ photoEl.addEventListener("change", () => {
   setTimeout(() => {
     reader.readAsDataURL(file)
   }, 0)
-})
+}
+
+photoEl.addEventListener("change", handlePhotoInput)
+if(photoLibraryEl)photoLibraryEl.addEventListener("change", handlePhotoInput)
 
 /** Compress image to max 800px and return base64 data URL. */
 function compressToDataUrl(dataUrl) {
@@ -225,6 +229,9 @@ labels:days.map(d=>d.slice(5)),
 datasets:[{data:totals,borderRadius:10}]
 },
 options:{
+responsive:true,
+maintainAspectRatio:true,
+layout:{padding:8},
 plugins:{legend:{display:false}},
 scales:{y:{beginAtZero:true}}
 }

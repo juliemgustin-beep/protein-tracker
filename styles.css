@@ -78,6 +78,12 @@ background:rgba(255,255,255,0.08);
 cursor:pointer
 }
 
+.photo-actions{
+display:flex;
+flex-wrap:wrap;
+gap:10px
+}
+
 .upload input{
 display:none
 }
@@ -111,4 +117,11 @@ height:100%;
 width:0%;
 background:linear-gradient(90deg,#4f7cff,#6fa8ff);
 transition:width .3s ease
+}
+
+.chart-container{
+position:relative;
+width:100%;
+height:220px;
+max-height:40vh
 }

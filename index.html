@@ -47,10 +47,16 @@ Goal: 100g • <span id="remaining">0g remaining</span>
 
 <h2>Add meal photo</h2>
 
+<div class="photo-actions">
 <label class="upload">
 <input id="photo" type="file" accept="image/*" capture="environment"/>
 Take photo
 </label>
+<label class="upload">
+<input id="photoLibrary" type="file" accept="image/*"/>
+Choose from library
+</label>
+</div>
 
 <img id="preview" alt="Photo preview" style="display:none; max-width:100%;"/>
 
@@ -72,7 +78,9 @@ Take photo
 <section class="card">
 
 <h2>Protein last 7 days</h2>
+<div class="chart-container">
 <canvas id="proteinChart"></canvas>
+</div>
 
 </section>
 
